@@ -1,13 +1,12 @@
-# Protokit starter-kit
+<div align="center">
+    <img alt="MINALEND" width="170" height="170" src="logo.png"/>
+</div>
 
-This repository is a monorepo aimed at kickstarting application chain development using the Protokit framework.
+# MINALEND - The First Unsecured Loans DeFi App with ZKP Technology
+
+This project is developed based on MINA's [Protokit](https://github.com/proto-kit) [starter-kit](https://github.com/proto-kit/starter-kit). ([original README](https://github.com/proto-kit/starter-kit/blob/develop/README.md)).
 
 ## Quick start
-
-The monorepo contains 1 package and 1 app:
-
-- `packages/chain` contains everything related to your app-chain
-- `apps/web` contains a demo UI that connects to your locally hosted app-chain sequencer
 
 **Prerequisites:**
 
@@ -15,20 +14,20 @@ The monorepo contains 1 package and 1 app:
 - pnpm `v9.8`
 - nvm
 
-For running with persistance / deploying on a server
-- docker `>= 24.0`
-- docker-compose `>= 2.22.0`
+To install NVM on MacOS, follow this [guide](https://sukiphan.medium.com/how-to-install-nvm-node-version-manager-on-macos-d9fe432cc7db).
+
+To install NVM in Ubuntu, follow this [guide](https://github.com/nvm-sh/nvm?tab=readme-ov-file#installing-and-updating).
 
 ## Setup
 
 ```zsh
-git clone https://github.com/proto-kit/starter-kit my-chain
-cd my-chain
-
-# ensures you have the right node.js version
+git clone https://github.com/EkamSinghPandher/MinaLend
+cd MinaLend
+nvm install v18
 nvm use
 pnpm install
 ```
+
 
 ## Running
 
@@ -39,7 +38,7 @@ You can use those environments to configure the mode of operation for your appch
 
 The starter kit comes with a set of pre-configured environments:
 - `inmemory`: Runs everything in-memory without persisting the data. Useful for early stages of runtime development.
-- `development`: Runs the sequencer locally and persists all state in databases running in docker. 
+- `development`: Runs the sequencer locally and persists all state in databases running in docker.
 - `sovereign`: Runs your appchain fully in docker (except the UI) for testnet deployments without settlement.
 
 Every command you execute should follow this pattern:
@@ -60,7 +59,7 @@ pnpm env:inmemory dev --filter web
 pnpm env:inmemory dev --filter chain
 ```
 
-> Be aware, the dev command will automatically restart your application when your sources change. 
+> Be aware, the dev command will automatically restart your application when your sources change.
 > If you don't want that, you can alternatively use `pnpm run build` and `pnpm run start`
 
 Navigate to `localhost:3000` to see the example UI, or to `localhost:8080/graphql` to see the GQL interface of the locally running sequencer.
@@ -95,7 +94,7 @@ pnpm env:development dev --filter web
 
 ### Deploying to a server
 
-When deploying to a server, you should push your code along with your forked starter-kit to some repository, 
+When deploying to a server, you should push your code along with your forked starter-kit to some repository,
 then clone it on your remote server and execute it.
 
 ```zsh

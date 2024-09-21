@@ -1,4 +1,4 @@
-import { Bool, PublicKey, Field, Proof, ZkProgram } from "o1js";
+import { Bool, PrivateKey, PublicKey, Field, Proof, ZkProgram } from "o1js";
 
 import {
     RuntimeModule,
@@ -8,9 +8,10 @@ import {
 } from "@proto-kit/module";
 import { State, StateMap, Option, assert } from "@proto-kit/protocol";
 import { Offer } from "./offer"
-import { UInt64 } from "@proto-kit/library";
-import { fromOffer, Loan } from "./loan";
+import { Balance, TokenId, UInt64 } from "@proto-kit/library";
 import { inject } from "tsyringe";
+import { Balances } from "./balances";
+import { fromOffer, Loan } from "./loan";
 import { Credential } from "./credential";
 import { GenerateProof } from "./generateProof";
 
@@ -19,8 +20,13 @@ export class MyProof extends ZkProgram.Proof(GenerateProof) { }
 
 
 interface MinaLendConfig {
-
+    tokenId: TokenId
 }
+
+export const errors = {
+    senderNotFrom: () => "Sender does not match 'from'",
+    fromBalanceInsufficient: () => "From balance is insufficient",
+};
 
 // We use the following numbers to represent the following states:
 // type OfferStatus = "offered" = 0 | "accepted" = 1 | "cleared" = 2 | "delayed" = 3 | "cancelled" = 4 ;
@@ -35,9 +41,33 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
 
 
 
-    // TODO: Deduct loan amount from the lender @Dumi
+    @state() public pool: PublicKey;
+
+    public constructor(@inject("Balances") public balances: Balances) {
+        super();
+
+        // generate an address for the liquidity pool without keeping the private key
+        let pvk = PrivateKey.random();
+        this.pool = PublicKey.fromPrivateKey(pvk);
+    }
+
+    public getPoolAddress() {
+        return this.pool;
+    }
+
     @runtimeMethod()
     public async createOffer(o: Offer) {
+        const tid = o.tokenId;
+        const from = this.transaction.sender.value;
+        assert(from.equals(o.lender), errors.senderNotFrom());
+
+        const balance = await this.balances.getBalance(tid, from);
+        assert(balance.greaterThanOrEqual(o.amount), errors.fromBalanceInsufficient());
+
+        // transfer tokens from lender to the pool
+        await this.balances.transfer(tid, from, this.pool, o.amount);
+
+        // save offer
         await this.offers.set(o.offerId, o);
     }
 
@@ -88,10 +118,10 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         let offer = offerResult.value;
 
         // check public input
-        assert(proof.publicInput.address.equals(borrower));
-        assert(proof.publicInput.credentialCommitment.equals((await this.credentialCommit.get()).value));
-        assert(proof.publicInput.minPropertyValue.equals(offer.minPropertyValue.value));
-        assert(proof.publicInput.minIncomeMonthly.equals(offer.minIncomeMonthly.value));
+        assert(proof.publicInput.address.equals(borrower), "Borrower does not match");
+        assert(proof.publicInput.credentialCommitment.equals((await this.credentialCommit.get()).value), "Credential commitment does not match");
+        assert(proof.publicInput.minPropertyValue.equals(offer.minPropertyValue.value), "Minimum property value does not match");
+        assert(proof.publicInput.minIncomeMonthly.equals(offer.minIncomeMonthly.value), "Minimum income monthly does not match");
 
         // verify proof 
         proof.verify();
@@ -107,7 +137,7 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
     // admin functions
     @runtimeMethod()
     public async updateCredentialCommit(credentialCommit: Field) {
-        assert(this.transaction.sender.value.equals((await this.admin.get()).value));
+        // assert(this.transaction.sender.value.equals((await this.admin.get()).value));
         this.credentialCommit.set(credentialCommit);
     }
 

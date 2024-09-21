@@ -1,4 +1,4 @@
-import { Balance, VanillaRuntimeModules } from "@proto-kit/library";
+import { Balance, VanillaRuntimeModules, TokenId } from "@proto-kit/library";
 import { ModulesConfig } from "@proto-kit/common";
 
 import { Balances } from "./modules/balances";
@@ -13,6 +13,10 @@ export const config: ModulesConfig<typeof modules> = {
   Balances: {
     totalSupply: Balance.from(10_000),
   },
+  MinaLendModule: {
+    tokenId: TokenId.from(0),
+  }, // Add this line
+
 };
 
 export default {

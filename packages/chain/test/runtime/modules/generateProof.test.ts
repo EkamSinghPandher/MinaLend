@@ -43,23 +43,5 @@ describe('Test GenerateMerkleProof', () => {
     const ok = await verify(proof, verificationKey);
     expect(ok).toBe(true);
 
-
-
-
-    // await merkleMap.set(key, value);
-
-    // const root = await merkleMap.getRoot();
-
-    // const witness = await merkleMap.getWitness(key);
-    // const proof = await GenerateProof.verifyCredential(
-    //     root,
-    //     witness,
-    //     key,
-    //     value,
-    // );
-
-    // const ok = await verify(proof, verificationKey);
-    // expect(ok).toBe(true);
-
   }, 1_000_000);
 });
