@@ -1,4 +1,4 @@
-import { AccountUpdate, Mina, PrivateKey, PublicKey, MerkleMap, Field, verify, Poseidon } from 'o1js';
+import { AccountUpdate, Mina, PrivateKey, PublicKey, MerkleMap, Field, verify, Poseidon, Bool } from 'o1js';
 import { Credential } from "../../../src/runtime/modules/credential";
 import { GenerateProof } from "../../../src/runtime/modules/generateProof";
 
@@ -14,6 +14,7 @@ describe('Test credential', () => {
         propertyValue: Field(2),
         incomeMonthly: Field(3),
         maskedAddress: Field(4),
+        blacklisted: Bool(false),
     });
 
     const credentialHash = credential.getCredentialHash();

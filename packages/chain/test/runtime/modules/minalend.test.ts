@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, PublicKey, MerkleMap, Field, Poseidon } from "o1js";
+import { PrivateKey, PublicKey, MerkleMap, Field, Poseidon, Bool } from "o1js";
 import { Balances } from "../../../src/runtime/modules/balances";
 import { MinaLendModule, MyProof } from "../../../src/runtime/modules/minalend";
 import { Offer } from "../../../src/runtime/modules/offer";
@@ -457,6 +457,7 @@ describe("minalend accept offer", () => {
         propertyValue: Field(20000000),
         incomeMonthly: Field(20000000),
         maskedAddress: maskedAddress,
+        blacklisted: Bool(false),
     });
 
     const credentialHash = credential.getCredentialHash();
@@ -609,6 +610,7 @@ describe("minalend repay loan", () => {
         propertyValue: Field(20000000),
         incomeMonthly: Field(20000000),
         maskedAddress: maskedAddress,
+        blacklisted: Bool(false),
     });
 
     const credentialHash = credential.getCredentialHash();
@@ -786,6 +788,7 @@ describe("minalend finalize loan", () => {
         propertyValue: Field(20000000),
         incomeMonthly: Field(20000000),
         maskedAddress: maskedAddress,
+        blacklisted: Bool(false),
     });
 
     const credentialHash = credential.getCredentialHash();

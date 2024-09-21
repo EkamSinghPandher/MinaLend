@@ -1,5 +1,5 @@
 import { TokenId, UInt64} from "@proto-kit/library";
-import { PublicKey, Struct, Field, MerkleMap, Poseidon, MerkleMapWitness } from "o1js";
+import { PublicKey, Struct, Field, MerkleMap, Poseidon, MerkleMapWitness, Bool } from "o1js";
 
 import {
     RuntimeModule,
@@ -19,6 +19,7 @@ export class Credential extends Struct({
     propertyValue: Field,
     incomeMonthly: Field,
     maskedAddress: Field,   // maskedAddress = hash(address, nonce)
+    blacklisted: Bool,
 }) { 
     public async addCredential(merkleMap: MerkleMap) {
         // const credential = new Credential({ identity, propertyValue, incomeMonthly, maskedAddress });
