@@ -12,6 +12,9 @@ import { GenerateProof, CredentialPublicInput } from "../../../src/runtime/modul
 
 log.setLevel("ERROR");
 
+// enable / disable proof generation (for fast testing)
+const Run_With_Proof = false;
+
 /// Test for creating the offer
 describe("minalend create offer", () => {
   it("should demonstrate how MinaLend creating of an offer works", async () => {
@@ -445,79 +448,84 @@ describe("minalend accept offer", () => {
     expect(block1?.transactions[0].status.toBoolean()).toBe(true);
     expect(savedOffer1?.amount.toBigInt()).toBe(offer1.amount.toBigInt());
 
-    const { verificationKey } = await GenerateProof.compile();
+    if (Run_With_Proof) {
+      const { verificationKey } = await GenerateProof.compile();
+      const merkleMap = new MerkleMap();
+      const nonce = Field(10);
+      const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
 
-    const merkleMap = new MerkleMap();
-
-    const nonce = Field(10);
-    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
-
-    const credential = new Credential({
+      const credential = new Credential({
         identity: Field(1),
         propertyValue: Field(20000000),
         incomeMonthly: Field(20000000),
         maskedAddress: maskedAddress,
         blacklisted: Bool(false),
-    });
+      });
 
-    const credentialHash = credential.getCredentialHash();
+      const credentialHash = credential.getCredentialHash();
 
-    await credential.addCredential(merkleMap);
+      await credential.addCredential(merkleMap);
 
-    const witness = await credential.getWitness(merkleMap);
+      const witness = await credential.getWitness(merkleMap);
 
-    const root = await merkleMap.getRoot();
+      const root = await merkleMap.getRoot();
 
-    // admin update credential commitment
-    appChain.setSigner(adminPrivateKey);
-    const tx2 = await appChain.transaction(adminPublicKey, async () => {
-      await minaLendMod.updateCredentialCommit(root);
-    });
+      // admin update credential commitment
+      appChain.setSigner(adminPrivateKey);
+      const tx2 = await appChain.transaction(adminPublicKey, async () => {
+        await minaLendMod.updateCredentialCommit(root);
+      });
 
-    await tx2.sign();
-    await tx2.send();
+      await tx2.sign();
+      await tx2.send();
 
-    const block2 = await appChain.produceBlock();
+      const block2 = await appChain.produceBlock();
 
-    const publicInput = new CredentialPublicInput({
+      const publicInput = new CredentialPublicInput({
         credentialCommitment: root,
         minPropertyValue: offer1.minPropertyValue.value,
         minIncomeMonthly: offer1.minIncomeMonthly.value,
         address: bobPublicKey,
-    });
+      });
 
-    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+      const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
 
-    expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
+      expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
 
-    const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
-    expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
-    expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
-    expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
+      const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
+      expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
+      expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
+      expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
 
-    const myProof = new MyProof(proof);
+      const myProof = new MyProof(proof);
 
-    // bob accept the offer
-    appChain.setSigner(bobPrivateKey);
-    const tx3 = await appChain.transaction(bobPublicKey, async () => {
-      await minaLendMod.acceptOffer(oKey, bobPublicKey, myProof);
-    });
+      // bob accept the offer
+      appChain.setSigner(bobPrivateKey);
+      const tx3 = await appChain.transaction(bobPublicKey, async () => {
+        await minaLendMod.acceptOfferWithProof(oKey, bobPublicKey, myProof);
+      });
 
-    await tx3.sign();
-    await tx3.send();
+      await tx3.sign();
+      await tx3.send();
+    }
+    else {
+      // bob accept the offer
+      appChain.setSigner(bobPrivateKey);
+      const tx3 = await appChain.transaction(bobPublicKey, async () => {
+        await minaLendMod.acceptOffer(oKey, bobPublicKey);
+      });
 
-    const block3= await appChain.produceBlock();
+      await tx3.sign();
+      await tx3.send();
+    }
+    const block3 = await appChain.produceBlock();
 
     const savedOffer2 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
     const savedLoan = await appChain.query.runtime.MinaLendModule.loans.get(oKey);
 
-    console.log("tx done");
     expect(block3?.transactions[0].status.toBoolean()).toBe(true);
-    console.log("tx ok");
-    console.log("status",savedOffer2?.status);
     expect(savedOffer2?.status.toBigInt()).toBe(1n);
     expect(savedLoan?.borrower).toEqual(bobPublicKey);
-
   }, 1_000_000);
 });
 
@@ -597,70 +605,78 @@ describe("minalend repay loan", () => {
     appChain.setSigner(bobPrivateKey);
 
 
+    if (Run_With_Proof) {
+      const { verificationKey } = await GenerateProof.compile();
 
-    const { verificationKey } = await GenerateProof.compile();
+      const merkleMap = new MerkleMap();
 
-    const merkleMap = new MerkleMap();
+      const nonce = Field(10);
+      const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
 
-    const nonce = Field(10);
-    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
-
-    const credential = new Credential({
+      const credential = new Credential({
         identity: Field(1),
         propertyValue: Field(20000000),
         incomeMonthly: Field(20000000),
         maskedAddress: maskedAddress,
         blacklisted: Bool(false),
-    });
+      });
 
-    const credentialHash = credential.getCredentialHash();
+      const credentialHash = credential.getCredentialHash();
 
-    await credential.addCredential(merkleMap);
+      await credential.addCredential(merkleMap);
 
-    const witness = await credential.getWitness(merkleMap);
+      const witness = await credential.getWitness(merkleMap);
 
-    const root = await merkleMap.getRoot();
+      const root = await merkleMap.getRoot();
 
-    // admin update credential commitment
-    appChain.setSigner(adminPrivateKey);
-    const tx20 = await appChain.transaction(adminPublicKey, async () => {
-      await minaLendMod.updateCredentialCommit(root);
-    });
+      // admin update credential commitment
+      appChain.setSigner(adminPrivateKey);
+      const tx20 = await appChain.transaction(adminPublicKey, async () => {
+        await minaLendMod.updateCredentialCommit(root);
+      });
 
-    await tx20.sign();
-    await tx20.send();
+      await tx20.sign();
+      await tx20.send();
 
-    const block20= await appChain.produceBlock();
+      const block20 = await appChain.produceBlock();
 
 
-    const publicInput = new CredentialPublicInput({
+      const publicInput = new CredentialPublicInput({
         credentialCommitment: root,
         minPropertyValue: offer1.minPropertyValue.value,
         minIncomeMonthly: offer1.minIncomeMonthly.value,
         address: bobPublicKey,
-    });
+      });
 
 
 
-    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+      const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
 
-    expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
-
-
-    const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
-    expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
-    expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
-    expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
-
-    const myProof = new MyProof(proof);
+      expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
 
 
-    // accept offer
-    const tx2 = await appChain.transaction(bobPublicKey, async () => {
-      await minaLendMod.acceptOffer(oKey, bobPublicKey, myProof);
-    });
-    await tx2.sign();
-    await tx2.send();
+      const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
+      expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
+      expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
+      expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
+
+      const myProof = new MyProof(proof);
+
+
+      // accept offer
+      const tx2 = await appChain.transaction(bobPublicKey, async () => {
+        await minaLendMod.acceptOfferWithProof(oKey, bobPublicKey, myProof);
+      });
+      await tx2.sign();
+      await tx2.send();
+    } else {
+      const tx2 = await appChain.transaction(bobPublicKey, async () => {
+        await minaLendMod.acceptOffer(oKey, bobPublicKey);
+      });
+      await tx2.sign();
+      await tx2.send();
+    }
+
     const block2 = await appChain.produceBlock();
 
     expect(block2?.transactions[0].status.toBoolean()).toBe(true);
@@ -774,72 +790,77 @@ describe("minalend finalize loan", () => {
     expect(savedOffer1?.amount.toBigInt()).toBe(1000n);
     appChain.setSigner(bobPrivateKey);
 
+    if (Run_With_Proof) {
+      const { verificationKey } = await GenerateProof.compile();
 
+      const merkleMap = new MerkleMap();
 
-    const { verificationKey } = await GenerateProof.compile();
+      const nonce = Field(10);
+      const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
 
-    const merkleMap = new MerkleMap();
-
-    const nonce = Field(10);
-    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
-
-    const credential = new Credential({
+      const credential = new Credential({
         identity: Field(1),
         propertyValue: Field(20000000),
         incomeMonthly: Field(20000000),
         maskedAddress: maskedAddress,
         blacklisted: Bool(false),
-    });
+      });
 
-    const credentialHash = credential.getCredentialHash();
+      const credentialHash = credential.getCredentialHash();
 
-    await credential.addCredential(merkleMap);
+      await credential.addCredential(merkleMap);
 
-    const witness = await credential.getWitness(merkleMap);
+      const witness = await credential.getWitness(merkleMap);
 
-    const root = await merkleMap.getRoot();
+      const root = await merkleMap.getRoot();
 
-    // admin update credential commitment
-    appChain.setSigner(adminPrivateKey);
-    const tx20 = await appChain.transaction(adminPublicKey, async () => {
-      await minaLendMod.updateCredentialCommit(root);
-    });
+      // admin update credential commitment
+      appChain.setSigner(adminPrivateKey);
+      const tx20 = await appChain.transaction(adminPublicKey, async () => {
+        await minaLendMod.updateCredentialCommit(root);
+      });
 
-    await tx20.sign();
-    await tx20.send();
+      await tx20.sign();
+      await tx20.send();
 
-    const block20= await appChain.produceBlock();
+      const block20 = await appChain.produceBlock();
 
 
-    const publicInput = new CredentialPublicInput({
+      const publicInput = new CredentialPublicInput({
         credentialCommitment: root,
         minPropertyValue: offer1.minPropertyValue.value,
         minIncomeMonthly: offer1.minIncomeMonthly.value,
         address: bobPublicKey,
-    });
+      });
+
+      const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+
+      expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
+
+
+      const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
+      expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
+      expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
+      expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
+
+      const myProof = new MyProof(proof);
 
 
 
-    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+      // accept offer
+      const tx2 = await appChain.transaction(bobPublicKey, async () => {
+        await minaLendMod.acceptOfferWithProof(oKey, bobPublicKey, myProof);
+      });
+      await tx2.sign();
+      await tx2.send();
+    } else {
+      const tx2 = await appChain.transaction(bobPublicKey, async () => {
+        await minaLendMod.acceptOffer(oKey, bobPublicKey);
+      });
+      await tx2.sign();
+      await tx2.send();
+    }
 
-    expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
-
-
-    const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
-    expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
-    expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
-    expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
-
-    const myProof = new MyProof(proof);
-
-
-
-    // accept offer
-    const tx2 = await appChain.transaction(bobPublicKey, async () => {
-      await minaLendMod.acceptOffer(oKey, bobPublicKey, myProof);
-    });
-    await tx2.sign();
-    await tx2.send();
     const block2 = await appChain.produceBlock();
     expect(block2?.transactions[0].status.toBoolean()).toBe(true);
 
