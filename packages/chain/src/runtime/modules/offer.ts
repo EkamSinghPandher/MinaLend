@@ -1,5 +1,5 @@
-import { TokenId } from "@proto-kit/library";
-import { PublicKey, Struct, UInt64 } from "o1js";
+import { TokenId, UInt64 } from "@proto-kit/library";
+import { PublicKey, Struct } from "o1js";
 
 export class Offer extends Struct({
     offerId: UInt64,
