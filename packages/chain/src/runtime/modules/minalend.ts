@@ -1,13 +1,13 @@
-import { Bool, PrivateKey, PublicKey } from "o1js";
+import { Bool, PrivateKey, Provable, PublicKey } from "o1js";
 import {
     RuntimeModule,
     runtimeModule,
     state,
     runtimeMethod,
 } from "@proto-kit/module";
-import { State, StateMap, Option, assert } from "@proto-kit/protocol";
+import { StateMap, assert } from "@proto-kit/protocol";
 import { Offer } from "./offer"
-import { Balance, TokenId, UInt64 } from "@proto-kit/library";
+import { Balance, TokenId, UInt112, UInt64 } from "@proto-kit/library";
 import { inject } from "tsyringe";
 import { Balances } from "./balances";
 import { fromOffer, Loan } from "./loan";
@@ -60,7 +60,6 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         await this.offers.set(o.offerId, o);
     }
 
-    // TODO: Return the loan amount to the lender @Dumi
     @runtimeMethod()
     public async cancelOffer(offerId: UInt64) {
         let offerResult = (await this.offers.get(offerId));
@@ -73,40 +72,155 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         // Make sure offer is unaccepted and valid
         assert(offer.status.equals(UInt64.from(0)));
 
+        // Make sure the pool has sufficient tokens
+        const poolBalance = await this.balances.getBalance(offer.tokenId, this.pool);
+        assert(poolBalance.greaterThanOrEqual(offer.amount));
+
         offer.status = UInt64.from(4)
         await this.offers.set(offerId, offer);
+
+        // transfer tokens from lender to the pool
+        await this.balances.transfer(offer.tokenId, this.pool, offer.lender, offer.amount);
     }
 
-    // TODO: If loan amount changes, either return or top up more assets @Dumi
+    /*
+    // UpdateOffer with Provable.if: it DOES NOT work! The transaction fails except for when the offers are identical.
     @runtimeMethod()
-    public async updateOffer(offerId: UInt64, o: Offer) {
+    public async updateOffer(offerId: UInt64, newOffer: Offer) {
         let offerResult = (await this.offers.get(offerId));
         assert(offerResult.isSome);
-        assert(offerId.equals(o.offerId));
-        let offer = offerResult.value;
+        assert(offerId.equals(newOffer.offerId));
+        let oldOffer = offerResult.value;
 
         // Ensure the one updating the offer is the one who made the offer
-        assert(this.transaction.sender.value.equals(offer.lender));
+        assert(this.transaction.sender.value.equals(oldOffer.lender));
+        assert(newOffer.lender.equals(oldOffer.lender));
 
         // Make sure offer is unaccepted and valid
-        assert(offer.status.equals(UInt64.from(0)));
+        assert(oldOffer.status.equals(UInt64.from(0)));
+        assert(newOffer.status.equals(UInt64.from(0)));
 
-        await this.offers.set(offerId, o);
+        const cond = oldOffer.amount.greaterThan(newOffer.amount);
+        const diff = Provable.if(
+            cond,
+            UInt64,
+            oldOffer.amount.sub(newOffer.amount),
+            newOffer.amount.sub(oldOffer.amount)
+        );
+        const from = Provable.if(
+            cond,
+            this.pool,
+            newOffer.lender
+        );
+        const to = Provable.if(
+            cond,
+            newOffer.lender,
+            this.pool
+        );
+
+        const d = UInt64.Unsafe.fromField(diff.value);
+        await this.balances.transfer(newOffer.tokenId, from, to, d);
+        await this.offers.set(offerId, newOffer);
+    }
+    */
+
+    private async updateOfferChecks(offerId: UInt64, newOffer: Offer) {
+        let offerResult = (await this.offers.get(offerId));
+        assert(offerResult.isSome);
+        assert(offerId.equals(newOffer.offerId));
+        let oldOffer = offerResult.value;
+
+        // Ensure the one updating the offer is the one who made the offer
+        assert(this.transaction.sender.value.equals(oldOffer.lender));
+        assert(newOffer.lender.equals(oldOffer.lender));
+
+        // Make sure offer is unaccepted and valid
+        assert(oldOffer.status.equals(UInt64.from(0)));
+        assert(newOffer.status.equals(UInt64.from(0)));
+
+        return oldOffer;
+    }
+
+    // We split updateOffer into up and down because Provable.if does not work!
+    @runtimeMethod()
+    public async updateOfferUp(offerId: UInt64, newOffer: Offer) {
+        const oldOffer = await this.updateOfferChecks(offerId, newOffer);
+
+        // Make sure the diff is positive
+        assert(oldOffer.amount.lessThan(newOffer.amount));
+
+        await this.balances.transfer(newOffer.tokenId, newOffer.lender, this.pool, newOffer.amount.sub(oldOffer.amount));
+        await this.offers.set(offerId, newOffer);
+    }
+
+    @runtimeMethod()
+    public async updateOfferDown(offerId: UInt64, newOffer: Offer) {
+        const oldOffer = await this.updateOfferChecks(offerId, newOffer);
+
+        // Make sure the diff is positive
+        assert(newOffer.amount.lessThan(oldOffer.amount));
+
+        await this.balances.transfer(newOffer.tokenId, this.pool, newOffer.lender, oldOffer.amount.sub(newOffer.amount));
+        await this.offers.set(offerId, newOffer);
     }
 
     // TODO: Verify Proof of assets @Jason
-    // TODO: Deduct the loan amount from pool and give it to the borrower @Dumi
     @runtimeMethod()
-    public async acceptOffer(offerId: UInt64, borrower: PublicKey){
+    public async acceptOffer(offerId: UInt64, borrower: PublicKey) {
         let offerResult = (await this.offers.get(offerId));
         assert(offerResult.isSome);
 
         let offer = offerResult.value;
-        offer.status =  UInt64.from(1);
+
+        // Make sure the pool has sufficient tokens
+        const poolBalance = await this.balances.getBalance(offer.tokenId, this.pool);
+        assert(poolBalance.greaterThanOrEqual(offer.amount));
+
+        offer.status = UInt64.from(1);
         offer.borrower = borrower;
 
         let loan = fromOffer(offer);
         await this.offers.set(offerId, offer);
         await this.loans.set(loan.loanId, loan);
+
+        // transfer tokens from pool to borrower
+        await this.balances.transfer(offer.tokenId, this.pool, offer.borrower, offer.amount);
+    }
+
+    @runtimeMethod()
+    public async repayLoan(loanId: UInt64, amount: UInt64) {
+        assert(amount.greaterThan(UInt64.from(0)));
+
+        let loanResult = await this.loans.get(loanId);
+        assert(loanResult.isSome);
+        let loan = loanResult.value;
+
+        let amountRemaining = loan.amountToPay.sub(loan.amountPaid);
+        assert(amountRemaining.greaterThanOrEqual(amount));
+        assert(this.transaction.sender.value.equals(loan.borrower));
+
+        await this.balances.transfer(this.config.tokenId, loan.borrower, loan.offer.lender, amount);
+
+        loan.amountPaid = loan.amountPaid.add(amount);
+
+        await this.loans.set(loan.loanId, loan);
+    }
+
+    @runtimeMethod()
+    public async finalizeLoan(loanId: UInt64) {
+        let loanResult = await this.loans.get(loanId);
+        assert(loanResult.isSome);
+        let loan = loanResult.value;
+
+        assert(loan.amountPaid.equals(loan.amountToPay));
+
+        loan.isCompleted = Bool(true);
+        await this.loans.set(loan.loanId, loan);
+
+        let offerResult = await this.offers.get(loanId);
+        assert(offerResult.isSome);
+        let offer = offerResult.value;
+        offer.status = UInt64.from(2);  // completed
+        await this.offers.set(offer.offerId, offer);
     }
 }
