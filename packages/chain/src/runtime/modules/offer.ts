@@ -1,6 +1,9 @@
+import { RuntimeModule } from "@proto-kit/module";
+import { runtimeModule } from "@proto-kit/module/dist/module/decorator";
 import { PublicKey } from "o1js";
 
-class Offer{
+@runtimeModule()
+class Offer extends RuntimeModule{
     offerId: string;
     lender: PublicKey;                 // The lender's identifier
     borrower: PublicKey;                  // The borrower's identifier
@@ -26,6 +29,7 @@ class Offer{
         penalty: number,
         status: number
     ) {
+        super();
         this.offerId = offerId;
         this.lender = lender;
         this.borrower = borrower;
