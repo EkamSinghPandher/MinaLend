@@ -11,7 +11,6 @@ export class Loan extends Struct({
     isCompleted: Bool
 }) { }
 
-
 export function fromOffer(o: Offer){
     let loanId = o.offerId;
     let offer = o;

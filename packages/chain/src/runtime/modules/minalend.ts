@@ -24,7 +24,6 @@ export const errors = {
 // We use the following numbers to represent the following states:
 // type OfferStatus = "offered" = 0 | "accepted" = 1 | "cleared" = 2 | "delayed" = 3 | "cancelled" = 4 ;
 
-
 @runtimeModule()
 export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
     @state() public offers = StateMap.from(UInt64, Offer);
@@ -45,19 +44,19 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
     }
 
     @runtimeMethod()
-    public async createOffer(o: Offer) {
-        const tid = o.tokenId;
+    public async createOffer(offer: Offer) {
+        const tid = offer.tokenId;
         const from = this.transaction.sender.value;
-        assert(from.equals(o.lender), errors.senderNotFrom());
+        assert(from.equals(offer.lender), errors.senderNotFrom());
 
         const balance = await this.balances.getBalance(tid, from);
-        assert(balance.greaterThanOrEqual(o.amount), errors.fromBalanceInsufficient());
+        assert(balance.greaterThanOrEqual(offer.amount), errors.fromBalanceInsufficient());
 
         // transfer tokens from lender to the pool
-        await this.balances.transfer(tid, from, this.pool, o.amount);
+        await this.balances.transfer(tid, from, this.pool, offer.amount);
 
         // save offer
-        await this.offers.set(o.offerId, o);
+        await this.offers.set(offer.offerId, offer);
     }
 
     @runtimeMethod()
@@ -220,7 +219,7 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         let offerResult = await this.offers.get(loanId);
         assert(offerResult.isSome);
         let offer = offerResult.value;
-        offer.status = UInt64.from(2);  // completed
+        offer.status = UInt64.from(2);  // 2 == completed
         await this.offers.set(offer.offerId, offer);
     }
 }
