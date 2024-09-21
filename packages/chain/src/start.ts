@@ -34,12 +34,12 @@ yargs(hideBin(process.argv))
     },
     async (args) => {
       log.setLevel(args.logLevel);
-
       // For windows support, we need to parse out environment variables used in the path
       let path = replaceEnvTemplates(args.appChain);
 
       const appChainFactory: AppChainFactory = (await import(path))
         .default;
+
       const appChain = await appChainFactory(args);
 
       await appChain.start();
@@ -51,6 +51,7 @@ function replaceEnvTemplates(str: string) {
   let temp = str;
 
   const envRegex = /\$[A-Z1-9_]*/;
+
 
   let m;
   while ((m = envRegex.exec(temp)) !== null) {
