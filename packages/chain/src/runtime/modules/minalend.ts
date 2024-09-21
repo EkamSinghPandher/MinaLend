@@ -37,6 +37,9 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         assert(offerResult.isSome);
         let offer = offerResult.value;
 
+        // Ensure the one cancelling the offer is the one who made the offer
+        assert(this.transaction.sender.value.equals(offer.lender));
+
         // Make sure offer is unaccepted and valid
         assert(offer.status.equals(UInt64.from(0)));
 
@@ -51,6 +54,9 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         assert(offerResult.isSome);
         assert(offerId.equals(o.offerId));
         let offer = offerResult.value;
+
+        // Ensure the one updating the offer is the one who made the offer
+        assert(this.transaction.sender.value.equals(offer.lender));
 
         // Make sure offer is unaccepted and valid
         assert(offer.status.equals(UInt64.from(0)));
