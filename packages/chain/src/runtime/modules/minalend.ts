@@ -176,14 +176,13 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         assert(poolBalance.greaterThanOrEqual(offer.amount));
 
         offer.status = UInt64.from(1);
-        offer.borrower = borrower;
 
-        let loan = fromOffer(offer);
+        let loan = fromOffer(offer, borrower);
         await this.offers.set(offerId, offer);
         await this.loans.set(loan.loanId, loan);
 
         // transfer tokens from pool to borrower
-        await this.balances.transfer(offer.tokenId, this.pool, offer.borrower, offer.amount);
+        await this.balances.transfer(offer.tokenId, this.pool, borrower, offer.amount);
     }
 
     @runtimeMethod()
@@ -198,7 +197,11 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         assert(amountRemaining.greaterThanOrEqual(amount));
         assert(this.transaction.sender.value.equals(loan.borrower));
 
-        await this.balances.transfer(this.config.tokenId, loan.borrower, loan.offer.lender, amount);
+        let offerResult = await this.offers.get(loanId);
+        assert(offerResult.isSome);
+        let offer = offerResult.value;
+
+        await this.balances.transfer(this.config.tokenId, loan.borrower, offer.lender, amount);
 
         loan.amountPaid = loan.amountPaid.add(amount);
 

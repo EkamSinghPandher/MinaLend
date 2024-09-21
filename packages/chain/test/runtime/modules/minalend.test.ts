@@ -45,7 +45,6 @@ describe("minalend create offer", () => {
     const offer = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: tokenId,
       amount: UInt64.from(15),
@@ -157,7 +156,6 @@ describe("minalend cancel offer", () => {
     const offer = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
       amount: UInt64.from(10),
@@ -251,7 +249,6 @@ describe("minalend update offer", () => {
     const offer1 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
       amount: UInt64.from(10),
@@ -298,7 +295,6 @@ describe("minalend update offer", () => {
     const offer2 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(5),
       tokenId: tokenId,
       amount: UInt64.from(15),
@@ -330,11 +326,10 @@ describe("minalend update offer", () => {
     const savedBalance2 = await appChain.query.runtime.Balances.balances.get(balanceKey);
     expect(savedBalance2?.toBigInt()).toBe(UInt64.from(5).toBigInt());
 
-     // update offer (down)
-     const offer3 = new Offer({
+    // update offer (down)
+    const offer3 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(5),
       tokenId: tokenId,
       amount: UInt64.from(5),
@@ -403,7 +398,6 @@ describe("minalend accept offer", () => {
     const offer1 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
       amount: UInt64.from(1000),
@@ -453,13 +447,14 @@ describe("minalend accept offer", () => {
     await tx2.sign();
     await tx2.send();
 
-    const block2= await appChain.produceBlock();
+    const block2 = await appChain.produceBlock();
 
     const savedOffer2 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
+    const savedLoan = await appChain.query.runtime.MinaLendModule.loans.get(oKey);
 
     expect(block2?.transactions[0].status.toBoolean()).toBe(true);
     expect(savedOffer2?.status.toBigInt()).toBe(1n);
-    expect(savedOffer2?.borrower).toEqual(bobPublicKey);
+    expect(savedLoan?.borrower).toEqual(bobPublicKey);
 
   }, 1_000_000);
 });
@@ -499,7 +494,6 @@ describe("minalend repay loan", () => {
     const offer1 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
       amount: UInt64.from(1000),
@@ -544,7 +538,7 @@ describe("minalend repay loan", () => {
     });
     await tx2.sign();
     await tx2.send();
-    const block2= await appChain.produceBlock();
+    const block2 = await appChain.produceBlock();
 
     expect(block2?.transactions[0].status.toBoolean()).toBe(true);
 
@@ -606,7 +600,6 @@ describe("minalend finalize loan", () => {
     const offer1 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
       amount: UInt64.from(1000),
@@ -662,7 +655,7 @@ describe("minalend finalize loan", () => {
     });
     await tx2.sign();
     await tx2.send();
-    const block2= await appChain.produceBlock();
+    const block2 = await appChain.produceBlock();
     expect(block2?.transactions[0].status.toBoolean()).toBe(true);
 
     // repay all
