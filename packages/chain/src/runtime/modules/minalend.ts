@@ -1,5 +1,4 @@
-import { PrivateKey, PublicKey } from "o1js";
-
+import { Bool, PrivateKey, PublicKey } from "o1js";
 import {
     RuntimeModule,
     runtimeModule,
@@ -11,6 +10,7 @@ import { Offer } from "./offer"
 import { Balance, TokenId, UInt64 } from "@proto-kit/library";
 import { inject } from "tsyringe";
 import { Balances } from "./balances";
+import { fromOffer, Loan } from "./loan";
 
 interface MinaLendConfig {
     tokenId: TokenId
@@ -28,6 +28,7 @@ export const errors = {
 @runtimeModule()
 export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
     @state() public offers = StateMap.from(UInt64, Offer);
+    @state() public loans = StateMap.from(UInt64, Loan);
 
     @state() public pool: PublicKey;
 
@@ -59,20 +60,53 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         await this.offers.set(o.offerId, o);
     }
 
+    // TODO: Return the loan amount to the lender @Dumi
     @runtimeMethod()
     public async cancelOffer(offerId: UInt64) {
         let offerResult = (await this.offers.get(offerId));
         assert(offerResult.isSome);
         let offer = offerResult.value;
+
+        // Ensure the one cancelling the offer is the one who made the offer
+        assert(this.transaction.sender.value.equals(offer.lender));
+
+        // Make sure offer is unaccepted and valid
+        assert(offer.status.equals(UInt64.from(0)));
+
         offer.status = UInt64.from(4)
         await this.offers.set(offerId, offer);
     }
 
+    // TODO: If loan amount changes, either return or top up more assets @Dumi
     @runtimeMethod()
     public async updateOffer(offerId: UInt64, o: Offer) {
-        let offerExists = (await this.offers.get(offerId)).isSome;
-        assert(offerExists);
+        let offerResult = (await this.offers.get(offerId));
+        assert(offerResult.isSome);
         assert(offerId.equals(o.offerId));
+        let offer = offerResult.value;
+
+        // Ensure the one updating the offer is the one who made the offer
+        assert(this.transaction.sender.value.equals(offer.lender));
+
+        // Make sure offer is unaccepted and valid
+        assert(offer.status.equals(UInt64.from(0)));
+
         await this.offers.set(offerId, o);
+    }
+
+    // TODO: Verify Proof of assets @Jason
+    // TODO: Deduct the loan amount from pool and give it to the borrower @Dumi
+    @runtimeMethod()
+    public async acceptOffer(offerId: UInt64, borrower: PublicKey){
+        let offerResult = (await this.offers.get(offerId));
+        assert(offerResult.isSome);
+
+        let offer = offerResult.value;
+        offer.status =  UInt64.from(1);
+        offer.borrower = borrower;
+
+        let loan = fromOffer(offer);
+        await this.offers.set(offerId, offer);
+        await this.loans.set(loan.loanId, loan);
     }
 }
