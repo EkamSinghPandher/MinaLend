@@ -1,12 +1,8 @@
 <div align="center">
     <img alt="MINALEND" width="120" height="120" src="logo.png"/>
-    <p align="center" style="font-size:24px;">
-    MINALEND
-    </p>
-    <p align="center" style="font-size:20px;">
-    The First Unsecured Loans DeFi App with ZKP Technology
-    </p>
 </div>
+
+# MINALEND - The First Unsecured Loans DeFi App with ZKP Technology
 
 This project is developed based on MINA's [Protokit](https://github.com/proto-kit) [starter-kit](https://github.com/proto-kit/starter-kit). ([original README](https://github.com/proto-kit/starter-kit/blob/develop/README.md)).
 
