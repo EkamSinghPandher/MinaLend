@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import protokit from "@/public/protokit-zinc.svg";
+import MinalendLogo from "@/public/logo.svg";
 import Image from "next/image";
 // @ts-ignore
 import truncateMiddle from "truncate-middle";
@@ -28,7 +28,7 @@ export default function Header({
     <div className="flex items-center justify-between border-b p-2 shadow-sm">
       <div className="container flex">
         <div className="flex basis-6/12 items-center justify-start">
-          <Image className="h-8 w-8" src={protokit} alt={"Protokit logo"} />
+          <Image className="h-20 w-20" src={MinalendLogo} alt={"Protokit logo"} />
           <Separator className="mx-4 h-8" orientation={"vertical"} />
           <div className="flex grow">
             <Chain height={blockHeight} />

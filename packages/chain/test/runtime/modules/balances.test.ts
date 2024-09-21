@@ -16,7 +16,7 @@ describe("balances", () => {
       Runtime: {
         Balances: {
           totalSupply: UInt64.from(10000),
-        },
+        }
       },
     });
 
