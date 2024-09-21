@@ -1,5 +1,5 @@
 "use client";
-import { Card } from "@/components/ui/card";
+import { Table, Tbody, Td, Th, Thead, Tr } from "./ui/table";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "./ui/form";
 import { useForm } from "react-hook-form";
@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 
 export interface FaucetProps {
   wallet?: string;
+  walletAddresses: string[]; // Array of wallet addresses to populate the table
   loading: boolean;
   onConnectWallet: () => void;
   onDrip: () => void;
@@ -14,53 +15,77 @@ export interface FaucetProps {
 
 export function Faucet({
   wallet,
+  walletAddresses,
   onConnectWallet,
   onDrip,
   loading,
 }: FaucetProps) {
-  const form = useForm();
-  return (
-    <Card className="w-full p-4">
-      <div className="mb-2">
-        <h2 className="text-xl font-bold">Faucet</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Get testing (L2) MINA tokens for your wallet
-        </p>
-      </div>
-      <Form {...form}>
-        <div className="pt-3">
-          <FormField
-            name="to"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  To{" "}
-                  <span className="text-sm text-zinc-500">(your wallet)</span>
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    disabled
-                    placeholder={wallet ?? "Please connect a wallet first"}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-        </div>
+  const lendingForm = useForm();
+  const borrowingForm = useForm();
 
-        <Button
-          size={"lg"}
-          type="submit"
-          className="mt-6 w-full"
-          loading={loading}
-          onClick={() => {
-            wallet ?? onConnectWallet();
-            wallet && onDrip();
-          }}
-        >
-          {wallet ? "Drip 💦" : "Connect wallet"}
-        </Button>
-      </Form>
-    </Card>
+  const handleButtonClick = () => {
+    if (!wallet) {
+      onConnectWallet();
+    } else {
+      onDrip();
+    }
+  };
+
+  return (
+    <div>
+      {/* Lending Table */}
+      <Table className="w-full">
+        <Thead>
+          <Tr>
+            <Th>Lending A Loan</Th>
+            <Th>Action</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
+          {walletAddresses.map((address, index) => (
+            <Tr key={index}>
+              <Td>{address}</Td>
+              <Td>
+                <Button
+                  size="sm"
+                  loading={loading}
+                  onClick={() => handleButtonClick()}
+                  disabled={!wallet}
+                >
+                  {wallet ? "Drip 💦" : "Connect wallet"}
+                </Button>
+              </Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </Table>
+
+      {/* Borrowing Table */}
+      <Table className="w-full mt-6">
+        <Thead>
+          <Tr>
+            <Th>Borrow a loan</Th>
+            <Th>Action</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
+          {walletAddresses.map((address, index) => (
+            <Tr key={index}>
+              <Td>{address}</Td>
+              <Td>
+                <Button
+                  size="sm"
+                  loading={loading}
+                  onClick={() => handleButtonClick()}
+                  disabled={!wallet}
+                >
+                  {wallet ? "Drip 💦" : "Connect wallet"}
+                </Button>
+              </Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </Table>
+    </div>
   );
 }
