@@ -1,10 +1,13 @@
 import { TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, PublicKey } from "o1js";
+import { PrivateKey, PublicKey, MerkleMap, Field, Poseidon } from "o1js";
 import { Balances } from "../../../src/runtime/modules/balances";
-import { MinaLendModule } from "../../../src/runtime/modules/minalend";
+import { MinaLendModule, MyProof } from "../../../src/runtime/modules/minalend";
 import { Offer } from "../../../src/runtime/modules/offer";
 import { log } from "@proto-kit/common";
 import { TokenId, UInt64 } from "@proto-kit/library";
+import { Credential } from "../../../src/runtime/modules/credential";
+import { GenerateProof, CredentialPublicInput } from "../../../src/runtime/modules/generateProof";
+
 
 log.setLevel("ERROR");
 
@@ -272,6 +275,7 @@ describe("minalend accept offer", () => {
     const alicePublicKey = alicePrivateKey.toPublicKey();
     const bobPrivateKey = PrivateKey.random();
     const bobPublicKey = alicePrivateKey.toPublicKey();
+
     const tokenId = TokenId.from(0);
 
     appChain.setSigner(alicePrivateKey);
@@ -309,9 +313,43 @@ describe("minalend accept offer", () => {
     expect(block1?.transactions[0].status.toBoolean()).toBe(true);
     expect(onChainOffer1?.amount.toBigInt()).toBe(1000n);
 
+    const { verificationKey } = await GenerateProof.compile();
+
+    const merkleMap = new MerkleMap();
+
+    const nonce = Field(10);
+    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
+
+    const credential = new Credential({
+        identity: Field(1),
+        propertyValue: Field(2),
+        incomeMonthly: Field(3),
+        maskedAddress: maskedAddress,
+    });
+
+    const credentialHash = credential.getCredentialHash();
+
+    await credential.addCredential(merkleMap);
+
+    const witness = await credential.getWitness(merkleMap);
+
+    const root = await merkleMap.getRoot();
+
+    const publicInput = new CredentialPublicInput({
+        credentialCommitment: root,
+        minPropertyValue: Field(1),
+        minIncomeMonthly: Field(1),
+        address: bobPublicKey,
+    });
+
+    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+
+
+    const myProof = new MyProof(proof);
+
    
     const tx2 = await appChain.transaction(bobPublicKey, async () => {
-      await minaLendMod.acceptOffer(oKey, bobPublicKey);
+      await minaLendMod.acceptOffer(oKey, bobPublicKey, myProof);
     });
 
     await tx2.sign();
@@ -323,6 +361,7 @@ describe("minalend accept offer", () => {
 
     expect(block2?.transactions[0].status.toBoolean()).toBe(true);
     expect(onChainOffer2?.status.toBigInt()).toBe(1n);
+
     expect(onChainOffer2?.borrower).toEqual(bobPublicKey);
 
   }, 1_000_000);

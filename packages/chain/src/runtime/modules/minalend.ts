@@ -1,4 +1,4 @@
-import { Bool, PublicKey } from "o1js";
+import { Bool, PublicKey, Field, Proof, ZkProgram } from "o1js";
 
 import {
     RuntimeModule,
@@ -10,6 +10,13 @@ import { State, StateMap, Option, assert } from "@proto-kit/protocol";
 import { Offer } from "./offer"
 import { UInt64 } from "@proto-kit/library";
 import { fromOffer, Loan } from "./loan";
+import { inject } from "tsyringe";
+import { Credential } from "./credential";
+import { GenerateProof } from "./generateProof";
+
+export class MyProof extends ZkProgram.Proof(GenerateProof) { }
+
+
 
 interface MinaLendConfig {
 
@@ -23,6 +30,10 @@ interface MinaLendConfig {
 export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
     @state() public offers = StateMap.from(UInt64, Offer);
     @state() public loans = StateMap.from(UInt64, Loan);
+    @state() public credentialCommit = State.from(Field);
+    @state() public admin = State.from(PublicKey);
+
+
 
     // TODO: Deduct loan amount from the lender @Dumi
     @runtimeMethod()
@@ -66,17 +77,43 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
 
     // TODO: Verify Proof of assets @Jason
     // TODO: Deduct the loan amount from pool and give it to the borrower @Dumi
+    // TODO: VerificationKey should be stored in the contract
     @runtimeMethod()
-    public async acceptOffer(offerId: UInt64, borrower: PublicKey){
+    public async acceptOffer(offerId: UInt64, borrower: PublicKey, proof: MyProof){
+
+        //(await this.admin.get()).value)
+
         let offerResult = (await this.offers.get(offerId));
         assert(offerResult.isSome);
-
         let offer = offerResult.value;
+
+        // check public input
+        assert(proof.publicInput.address.equals(borrower));
+        assert(proof.publicInput.credentialCommitment.equals((await this.credentialCommit.get()).value));
+        assert(proof.publicInput.minPropertyValue.equals(offer.minPropertyValue.value));
+        assert(proof.publicInput.minIncomeMonthly.equals(offer.minIncomeMonthly.value));
+
+        // verify proof 
+        proof.verify();
+
         offer.status =  UInt64.from(1);
         offer.borrower = borrower;
 
         let loan = fromOffer(offer);
         await this.offers.set(offerId, offer);
         await this.loans.set(loan.loanId, loan);
+    }
+
+    // admin functions
+    @runtimeMethod()
+    public async updateCredentialCommit(credentialCommit: Field) {
+        assert(this.transaction.sender.value.equals((await this.admin.get()).value));
+        this.credentialCommit.set(credentialCommit);
+    }
+
+    @runtimeMethod()
+    public async updateAdmin(admin: PublicKey) {
+        assert(this.transaction.sender.value.equals((await this.admin.get()).value));
+        this.admin.set(admin);
     }
 }

@@ -25,11 +25,6 @@ export class Credential extends Struct({
         const credentialHash = Poseidon.hash([this.identity, this.propertyValue, this.incomeMonthly, this.maskedAddress]);
         await merkleMap.set(this.identity, credentialHash);
     }
-    // public async addCredential(merkleMap: MerkleMap, identity: Field, propertyValue: Field, incomeMonthly: Field, maskedAddress: Field) {
-    //     const credential = new Credential({ identity, propertyValue, incomeMonthly, maskedAddress });
-    //     const credentialHash = Poseidon.hash([credential.identity, credential.propertyValue, credential.incomeMonthly, credential.maskedAddress]);
-    //     await merkleMap.set(identity, credentialHash);
-    // }
 
     public async getWitness(merkleMap: MerkleMap) {
         const witness = await merkleMap.getWitness(this.identity);
@@ -41,5 +36,23 @@ export class Credential extends Struct({
         return credentialHash;
     }
 }
+
+// @runtimeModule()
+// export class CredentialModule extends RuntimeModule<CredentialConfig> {
+//     @state() public credentialCommit = State.from(Field);
+//     @state() public admin = State.from(PublicKey);
+
+//     @runtimeMethod()
+//     public async updateCredentialCommit(credentialCommit: Field) {
+//         assert(this.transaction.sender.value.equals((await this.admin.get()).value));
+//         this.credentialCommit.set(credentialCommit);
+//     }
+
+//     @runtimeMethod()
+//     public async updateAdmin(admin: PublicKey) {
+//         assert(this.transaction.sender.value.equals((await this.admin.get()).value));
+//         this.admin.set(admin);
+//     }
+// }
 
 

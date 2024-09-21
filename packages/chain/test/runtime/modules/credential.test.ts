@@ -1,12 +1,11 @@
 import { AccountUpdate, Mina, PrivateKey, PublicKey, MerkleMap, Field, verify, Poseidon } from 'o1js';
 import { Credential } from "../../../src/runtime/modules/credential";
-import { GenerateMerkleProof } from "../../../src/runtime/modules/GenerateMerkleProof";
+import { GenerateProof } from "../../../src/runtime/modules/generateProof";
 
 
 describe('Test credential', () => {
   it('should generate a zk merkle proof and verify it', async () => {
-    console.log('generating verification key');
-    const { verificationKey } = await GenerateMerkleProof.compile();
+    const { verificationKey } = await GenerateProof.compile();
 
     const merkleMap = new MerkleMap();
 
@@ -24,19 +23,6 @@ describe('Test credential', () => {
     const witness = await credential.getWitness(merkleMap);
 
     const root = await merkleMap.getRoot();
-
-    const proof = await GenerateMerkleProof.verifyCredential(
-        root,
-        witness,
-        credential.identity,
-        credentialHash,
-    );
-
-    const ok = await verify(proof, verificationKey);
-    expect(ok).toBe(true);
-    console.log('ok', ok);
-
-
 
   }, 1_000_000);
 });
