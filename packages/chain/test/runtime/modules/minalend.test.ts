@@ -1,10 +1,11 @@
+import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey } from "o1js";
 import { Balances } from "../../../src/runtime/modules/balances";
 import { MinaLendModule } from "../../../src/runtime/modules/minalend";
 import { Offer } from "../../../src/runtime/modules/offer";
 import { log } from "@proto-kit/common";
-import { TokenId, UInt64 } from "@proto-kit/library";
+import { BalancesKey, TokenId, UInt64 } from "@proto-kit/library";
 
 log.setLevel("ERROR");
 
@@ -12,8 +13,11 @@ log.setLevel("ERROR");
 describe("minalend create offer", () => {
   it("should demonstrate how MinaLend creating of an offer works", async () => {
     const appChain = TestingAppChain.fromRuntime({
+      Balances,
       MinaLendModule,
     });
+
+    const tokenId = TokenId.from(0);
 
     appChain.configurePartial({
       Runtime: {
@@ -21,7 +25,7 @@ describe("minalend create offer", () => {
           totalSupply: UInt64.from(10000),
         },
         MinaLendModule: {
-
+          tokenId: tokenId
         }
       },
     });
@@ -30,9 +34,9 @@ describe("minalend create offer", () => {
 
     const alicePrivateKey = PrivateKey.random();
     const alicePublicKey = alicePrivateKey.toPublicKey();
+
     const bobPrivateKey = PrivateKey.random();
-    const bobPublicKey = alicePrivateKey.toPublicKey();
-    const tokenId = TokenId.from(0);
+    const bobPublicKey = bobPrivateKey.toPublicKey();
 
     appChain.setSigner(alicePrivateKey);
 
@@ -43,8 +47,8 @@ describe("minalend create offer", () => {
       lender: alicePublicKey,
       borrower: bobPublicKey,
       annualInterestRate: UInt64.from(10),
-      tokenId: TokenId.from(0),
-      amount: UInt64.from(1000),
+      tokenId: tokenId,
+      amount: UInt64.from(15),
       period: UInt64.from(12),
       minPropertyValue: UInt64.from(100000),
       minIncomeMonthly: UInt64.from(10000),
@@ -53,8 +57,24 @@ describe("minalend create offer", () => {
     }
     );
 
+    const balances = appChain.runtime.resolve("Balances");
     const minaLendMod = appChain.runtime.resolve("MinaLendModule");
 
+    // init: add balance to Alice (should succed)
+    const tx0 = await appChain.transaction(alicePublicKey, async () => {
+      await balances.addBalance(tokenId, alicePublicKey, UInt64.from(20));
+    });
+    await tx0.sign();
+    await tx0.send();
+    const block0 = await appChain.produceBlock();
+    expect(block0?.transactions[0].status.toBoolean()).toBe(true);
+    const key = new BalancesKey({ tokenId, address: alicePublicKey });
+    const savedBalance = await appChain.query.runtime.Balances.balances.get(key);
+    expect(savedBalance?.toBigInt()).toBe(20n);
+
+    // test 1: should fail (sent by Alice on behalf of Bob)
+    offer.offerId = oKey;
+    offer.lender = bobPublicKey;
     const tx1 = await appChain.transaction(alicePublicKey, async () => {
       await minaLendMod.createOffer(offer);
     });
@@ -62,22 +82,54 @@ describe("minalend create offer", () => {
     await tx1.sign();
     await tx1.send();
 
-    const block = await appChain.produceBlock();
+    const block1 = await appChain.produceBlock();
+    expect(block1?.transactions[0].status.toBoolean()).toBe(false);
 
-    const onChainOffer = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
+    // test 2: offer is saved and can be retrieved (and pool balance is updated)
+    offer.offerId = oKey;
+    offer.lender = alicePublicKey;
+    const tx2 = await appChain.transaction(alicePublicKey, async () => {
+      await minaLendMod.createOffer(offer);
+    });
 
-    expect(block?.transactions[0].status.toBoolean()).toBe(true);
-    expect(onChainOffer?.status.toBigInt()).toBe(0n);
+    await tx2.sign();
+    await tx2.send();
+
+    const block2 = await appChain.produceBlock();
+    const savedOffer = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
+
+    expect(block2?.transactions[0].status.toBoolean()).toBe(true);
+    expect(savedOffer?.offerId.toBigInt()).toBe(oKey.toBigInt());
+
+    const poolAddr = minaLendMod.getPoolAddress();
+    const poolKey = new BalancesKey({ tokenId, address: poolAddr });
+    const savedPoolBalance = await appChain.query.runtime.Balances.balances.get(poolKey);
+    expect(savedPoolBalance?.toBigInt()).toBe(offer.amount.toBigInt());
+
+    // test 3: not enough balance (should fail)
+    offer.offerId = UInt64.from(15);
+    offer.lender = alicePublicKey;
+    const tx3 = await appChain.transaction(alicePublicKey, async () => {
+      await minaLendMod.createOffer(offer);
+    });
+
+    await tx3.sign();
+    await tx3.send();
+
+    const block3 = await appChain.produceBlock();
+    expect(block3?.transactions[0].status.toBoolean()).toBe(false);
   }, 1_000_000);
 });
-
 
 /// Test for cancelling the offer
 describe("minalend cancel offer", () => {
   it("should demonstrate how MinaLend cancelling of an offer works", async () => {
     const appChain = TestingAppChain.fromRuntime({
+      Balances,
       MinaLendModule,
     });
+
+    const tokenId = TokenId.from(0);
 
     appChain.configurePartial({
       Runtime: {
@@ -85,7 +137,7 @@ describe("minalend cancel offer", () => {
           totalSupply: UInt64.from(10000),
         },
         MinaLendModule: {
-
+          tokenId: tokenId
         }
       },
     });
@@ -94,9 +146,9 @@ describe("minalend cancel offer", () => {
 
     const alicePrivateKey = PrivateKey.random();
     const alicePublicKey = alicePrivateKey.toPublicKey();
+
     const bobPrivateKey = PrivateKey.random();
-    const bobPublicKey = alicePrivateKey.toPublicKey();
-    const tokenId = TokenId.from(0);
+    const bobPublicKey = bobPrivateKey.toPublicKey();
 
     appChain.setSigner(alicePrivateKey);
 
@@ -108,7 +160,7 @@ describe("minalend cancel offer", () => {
       borrower: bobPublicKey,
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
-      amount: UInt64.from(1000),
+      amount: UInt64.from(10),
       period: UInt64.from(12),
       minPropertyValue: UInt64.from(100000),
       minIncomeMonthly: UInt64.from(10000),
@@ -117,8 +169,22 @@ describe("minalend cancel offer", () => {
     }
     );
 
+    const balances = appChain.runtime.resolve("Balances");
     const minaLendMod = appChain.runtime.resolve("MinaLendModule");
 
+    // init: add balance to Alice (should succed)
+    const tx0 = await appChain.transaction(alicePublicKey, async () => {
+      await balances.addBalance(tokenId, alicePublicKey, UInt64.from(20));
+    });
+    await tx0.sign();
+    await tx0.send();
+    const block0 = await appChain.produceBlock();
+    expect(block0?.transactions[0].status.toBoolean()).toBe(true);
+    const key = new BalancesKey({ tokenId, address: alicePublicKey });
+    const savedBalance = await appChain.query.runtime.Balances.balances.get(key);
+    expect(savedBalance?.toBigInt()).toBe(20n);
+
+    // actual tx
     const tx1 = await appChain.transaction(alicePublicKey, async () => {
       await minaLendMod.createOffer(offer);
     });
@@ -128,10 +194,10 @@ describe("minalend cancel offer", () => {
 
     const block1 = await appChain.produceBlock();
 
-    const onChainOffer1 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
+    const savedOffer1 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
 
     expect(block1?.transactions[0].status.toBoolean()).toBe(true);
-    expect(onChainOffer1?.status.toBigInt()).toBe(0n);
+    expect(savedOffer1?.status.toBigInt()).toBe(0n);
 
     const tx2 = await appChain.transaction(alicePublicKey, async () => {
       await minaLendMod.cancelOffer(oKey);
@@ -140,23 +206,25 @@ describe("minalend cancel offer", () => {
     await tx2.sign();
     await tx2.send();
 
-    const block2= await appChain.produceBlock();
+    const block2 = await appChain.produceBlock();
 
-    const onChainOffer2 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
+    const savedOffer2 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
 
     expect(block2?.transactions[0].status.toBoolean()).toBe(true);
-    expect(onChainOffer2?.status.toBigInt()).toBe(4n);
+    expect(savedOffer2?.status.toBigInt()).toBe(4n);
 
   }, 1_000_000);
 });
-
 
 /// Test for updating the offer
 describe("minalend cancel offer", () => {
   it("should demonstrate how MinaLend cancelling of an offer works", async () => {
     const appChain = TestingAppChain.fromRuntime({
+      Balances,
       MinaLendModule,
     });
+
+    const tokenId = TokenId.from(0);
 
     appChain.configurePartial({
       Runtime: {
@@ -164,7 +232,7 @@ describe("minalend cancel offer", () => {
           totalSupply: UInt64.from(10000),
         },
         MinaLendModule: {
-
+          tokenId: tokenId
         }
       },
     });
@@ -174,8 +242,7 @@ describe("minalend cancel offer", () => {
     const alicePrivateKey = PrivateKey.random();
     const alicePublicKey = alicePrivateKey.toPublicKey();
     const bobPrivateKey = PrivateKey.random();
-    const bobPublicKey = alicePrivateKey.toPublicKey();
-    const tokenId = TokenId.from(0);
+    const bobPublicKey = bobPrivateKey.toPublicKey();
 
     appChain.setSigner(alicePrivateKey);
 
@@ -187,7 +254,7 @@ describe("minalend cancel offer", () => {
       borrower: bobPublicKey,
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
-      amount: UInt64.from(1000),
+      amount: UInt64.from(10),
       period: UInt64.from(12),
       minPropertyValue: UInt64.from(100000),
       minIncomeMonthly: UInt64.from(10000),
@@ -196,8 +263,22 @@ describe("minalend cancel offer", () => {
     }
     );
 
+    const balances = appChain.runtime.resolve("Balances");
     const minaLendMod = appChain.runtime.resolve("MinaLendModule");
 
+    // init: add balance to Alice (should succed)
+    const tx0 = await appChain.transaction(alicePublicKey, async () => {
+      await balances.addBalance(tokenId, alicePublicKey, UInt64.from(20));
+    });
+    await tx0.sign();
+    await tx0.send();
+    const block0 = await appChain.produceBlock();
+    expect(block0?.transactions[0].status.toBoolean()).toBe(true);
+    const key = new BalancesKey({ tokenId, address: alicePublicKey });
+    const savedBalance = await appChain.query.runtime.Balances.balances.get(key);
+    expect(savedBalance?.toBigInt()).toBe(20n);
+
+    // actual tx
     const tx1 = await appChain.transaction(alicePublicKey, async () => {
       await minaLendMod.createOffer(offer1);
     });
@@ -207,19 +288,19 @@ describe("minalend cancel offer", () => {
 
     const block1 = await appChain.produceBlock();
 
-    const onChainOffer1 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
+    const savedOffer1 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
 
     expect(block1?.transactions[0].status.toBoolean()).toBe(true);
-    expect(onChainOffer1?.annualInterestRate.toBigInt()).toBe(10n);
-    expect(onChainOffer1?.amount.toBigInt()).toBe(1000n);
+    expect(savedOffer1?.annualInterestRate.toBigInt()).toBe(offer1.annualInterestRate.toBigInt());
+    expect(savedOffer1?.amount.toBigInt()).toBe(offer1.amount.toBigInt());
 
     const offer2 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
       borrower: bobPublicKey,
       annualInterestRate: UInt64.from(5),
-      tokenId: TokenId.from(0),
-      amount: UInt64.from(500),
+      tokenId: tokenId,
+      amount: UInt64.from(5),
       period: UInt64.from(12),
       minPropertyValue: UInt64.from(100000),
       minIncomeMonthly: UInt64.from(10000),
@@ -235,16 +316,13 @@ describe("minalend cancel offer", () => {
     await tx2.sign();
     await tx2.send();
 
-    const block2= await appChain.produceBlock();
+    const block2 = await appChain.produceBlock();
 
-    const onChainOffer2 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
+    const savedOffer2 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
 
     expect(block2?.transactions[0].status.toBoolean()).toBe(true);
-    expect(onChainOffer2?.annualInterestRate.toBigInt()).toBe(5n);
-    expect(onChainOffer2?.amount.toBigInt()).toBe(500n);
+    expect(savedOffer2?.annualInterestRate.toBigInt()).toBe(offer2.annualInterestRate.toBigInt());
+    expect(savedOffer2?.amount.toBigInt()).toBe(offer2.amount.toBigInt());
 
   }, 1_000_000);
 });
-
-
-
