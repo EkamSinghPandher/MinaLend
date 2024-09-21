@@ -30,6 +30,9 @@ export const GenerateProof = ZkProgram({
         // check if the masked address is correct
         const maskedAddress = Poseidon.hash([...publicInput.address.toFields(), nonce]);
         credential.maskedAddress.assertEquals(maskedAddress);
+
+        // check if the credential is not blacklisted
+        credential.blacklisted.assertFalse();
       },
     },
 
