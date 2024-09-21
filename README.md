@@ -24,7 +24,7 @@ To install NVM in Ubuntu, follow this [guide](https://github.com/nvm-sh/nvm?tab=
 ## Setup
 
 ```zsh
-git clone https://github.com/EkamSinghPandher/MinaLend
+git clone https://github.com/EkamSinghPandher/ZkCredit
 cd MinaLend
 nvm install v18
 nvm use
