@@ -1,4 +1,4 @@
-import { AccountUpdate, Mina, PrivateKey, PublicKey, MerkleMap, Field, verify, Poseidon } from 'o1js';
+import { AccountUpdate, Mina, PrivateKey, PublicKey, MerkleMap, Field, verify, Poseidon, Bool } from 'o1js';
 import { GenerateProof, CredentialPublicInput } from "../../../src/runtime/modules/generateProof";
 import { Credential } from "../../../src/runtime/modules/credential";
 
@@ -22,6 +22,7 @@ describe('Test GenerateMerkleProof', () => {
       propertyValue: Field(2),
       incomeMonthly: Field(3),
       maskedAddress: maskedAddress,
+      blacklisted: Bool(false),
   });
 
     const minPropertyValue = Field(1);
