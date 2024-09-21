@@ -1,16 +1,23 @@
-import { Bool, PrivateKey, Provable, PublicKey } from "o1js";
+import { Bool, PrivateKey, PublicKey, Provable,Field, Proof, ZkProgram } from "o1js";
+
 import {
     RuntimeModule,
     runtimeModule,
     state,
     runtimeMethod,
 } from "@proto-kit/module";
-import { StateMap, assert } from "@proto-kit/protocol";
+import { StateMap, assert, State } from "@proto-kit/protocol";
 import { Offer } from "./offer"
 import { Balance, TokenId, UInt112, UInt64 } from "@proto-kit/library";
 import { inject } from "tsyringe";
 import { Balances } from "./balances";
 import { fromOffer, Loan } from "./loan";
+import { Credential } from "./credential";
+import { GenerateProof } from "./generateProof";
+
+export class MyProof extends ZkProgram.Proof(GenerateProof) { }
+
+
 
 interface MinaLendConfig {
     tokenId: TokenId
@@ -28,6 +35,10 @@ export const errors = {
 export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
     @state() public offers = StateMap.from(UInt64, Offer);
     @state() public loans = StateMap.from(UInt64, Loan);
+    @state() public credentialCommit = State.from(Field);
+    @state() public admin = State.from(PublicKey);
+
+
 
     @state() public pool: PublicKey;
 
@@ -164,13 +175,27 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
     }
 
     // TODO: Verify Proof of assets @Jason
+    // TODO: Deduct the loan amount from pool and give it to the borrower @Dumi
+    // TODO: VerificationKey should be stored in the contract
     @runtimeMethod()
-    public async acceptOffer(offerId: UInt64, borrower: PublicKey) {
+    public async acceptOffer(offerId: UInt64, borrower: PublicKey, proof: MyProof){
+
+        //(await this.admin.get()).value)
+
         let offerResult = (await this.offers.get(offerId));
         assert(offerResult.isSome);
-
         let offer = offerResult.value;
 
+        // check public input
+        assert(proof.publicInput.address.equals(borrower), "Borrower does not match");
+        assert(proof.publicInput.credentialCommitment.equals((await this.credentialCommit.get()).value), "Credential commitment does not match");
+        assert(proof.publicInput.minPropertyValue.equals(offer.minPropertyValue.value), "Minimum property value does not match");
+        assert(proof.publicInput.minIncomeMonthly.equals(offer.minIncomeMonthly.value), "Minimum income monthly does not match");
+
+        // verify proof 
+        proof.verify();
+
+        offer.status =  UInt64.from(1);
         // Make sure the pool has sufficient tokens
         const poolBalance = await this.balances.getBalance(offer.tokenId, this.pool);
         assert(poolBalance.greaterThanOrEqual(offer.amount));
@@ -224,5 +249,18 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         let offer = offerResult.value;
         offer.status = UInt64.from(2);  // 2 == completed
         await this.offers.set(offer.offerId, offer);
+    }
+
+    // admin functions
+    @runtimeMethod()
+    public async updateCredentialCommit(credentialCommit: Field) {
+        // assert(this.transaction.sender.value.equals((await this.admin.get()).value));
+        this.credentialCommit.set(credentialCommit);
+    }
+
+    @runtimeMethod()
+    public async updateAdmin(admin: PublicKey) {
+        assert(this.transaction.sender.value.equals((await this.admin.get()).value));
+        this.admin.set(admin);
     }
 }

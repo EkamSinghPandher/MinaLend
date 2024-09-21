@@ -1,11 +1,14 @@
 import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
-import { Bool, PrivateKey, PublicKey } from "o1js";
+import { PrivateKey, PublicKey, MerkleMap, Field, Poseidon } from "o1js";
 import { Balances } from "../../../src/runtime/modules/balances";
-import { MinaLendModule } from "../../../src/runtime/modules/minalend";
+import { MinaLendModule, MyProof } from "../../../src/runtime/modules/minalend";
 import { Offer } from "../../../src/runtime/modules/offer";
 import { log } from "@proto-kit/common";
-import { BalancesKey, TokenId, UInt64 } from "@proto-kit/library";
+import { TokenId, UInt64, BalancesKey } from "@proto-kit/library";
+import { Credential } from "../../../src/runtime/modules/credential";
+import { GenerateProof, CredentialPublicInput } from "../../../src/runtime/modules/generateProof";
+
 
 log.setLevel("ERROR");
 
@@ -391,6 +394,9 @@ describe("minalend accept offer", () => {
     const bobPrivateKey = PrivateKey.random();
     const bobPublicKey = bobPrivateKey.toPublicKey();
 
+    const adminPrivateKey = PrivateKey.random();
+    const adminPublicKey = adminPrivateKey.toPublicKey();
+
     appChain.setSigner(alicePrivateKey);
 
     const oKey = UInt64.from(12);
@@ -439,9 +445,32 @@ describe("minalend accept offer", () => {
     expect(block1?.transactions[0].status.toBoolean()).toBe(true);
     expect(savedOffer1?.amount.toBigInt()).toBe(offer1.amount.toBigInt());
 
-    appChain.setSigner(bobPrivateKey);
-    const tx2 = await appChain.transaction(bobPublicKey, async () => {
-      await minaLendMod.acceptOffer(oKey, bobPublicKey);
+    const { verificationKey } = await GenerateProof.compile();
+
+    const merkleMap = new MerkleMap();
+
+    const nonce = Field(10);
+    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
+
+    const credential = new Credential({
+        identity: Field(1),
+        propertyValue: Field(20000000),
+        incomeMonthly: Field(20000000),
+        maskedAddress: maskedAddress,
+    });
+
+    const credentialHash = credential.getCredentialHash();
+
+    await credential.addCredential(merkleMap);
+
+    const witness = await credential.getWitness(merkleMap);
+
+    const root = await merkleMap.getRoot();
+
+    // admin update credential commitment
+    appChain.setSigner(adminPrivateKey);
+    const tx2 = await appChain.transaction(adminPublicKey, async () => {
+      await minaLendMod.updateCredentialCommit(root);
     });
 
     await tx2.sign();
@@ -449,10 +478,42 @@ describe("minalend accept offer", () => {
 
     const block2 = await appChain.produceBlock();
 
+    const publicInput = new CredentialPublicInput({
+        credentialCommitment: root,
+        minPropertyValue: offer1.minPropertyValue.value,
+        minIncomeMonthly: offer1.minIncomeMonthly.value,
+        address: bobPublicKey,
+    });
+
+    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+
+    expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
+
+    const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
+    expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
+    expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
+    expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
+
+    const myProof = new MyProof(proof);
+
+    // bob accept the offer
+    appChain.setSigner(bobPrivateKey);
+    const tx3 = await appChain.transaction(bobPublicKey, async () => {
+      await minaLendMod.acceptOffer(oKey, bobPublicKey, myProof);
+    });
+
+    await tx3.sign();
+    await tx3.send();
+
+    const block3= await appChain.produceBlock();
+
     const savedOffer2 = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
     const savedLoan = await appChain.query.runtime.MinaLendModule.loans.get(oKey);
 
-    expect(block2?.transactions[0].status.toBoolean()).toBe(true);
+    console.log("tx done");
+    expect(block3?.transactions[0].status.toBoolean()).toBe(true);
+    console.log("tx ok");
+    console.log("status",savedOffer2?.status);
     expect(savedOffer2?.status.toBigInt()).toBe(1n);
     expect(savedLoan?.borrower).toEqual(bobPublicKey);
 
@@ -486,6 +547,8 @@ describe("minalend repay loan", () => {
     const alicePublicKey = alicePrivateKey.toPublicKey();
     const bobPrivateKey = PrivateKey.random();
     const bobPublicKey = bobPrivateKey.toPublicKey();
+    const adminPrivateKey = PrivateKey.random();
+    const adminPublicKey = adminPrivateKey.toPublicKey();
 
     appChain.setSigner(alicePrivateKey);
 
@@ -532,9 +595,67 @@ describe("minalend repay loan", () => {
     expect(savedOffer1?.amount.toBigInt()).toBe(1000n);
     appChain.setSigner(bobPrivateKey);
 
+
+
+    const { verificationKey } = await GenerateProof.compile();
+
+    const merkleMap = new MerkleMap();
+
+    const nonce = Field(10);
+    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
+
+    const credential = new Credential({
+        identity: Field(1),
+        propertyValue: Field(20000000),
+        incomeMonthly: Field(20000000),
+        maskedAddress: maskedAddress,
+    });
+
+    const credentialHash = credential.getCredentialHash();
+
+    await credential.addCredential(merkleMap);
+
+    const witness = await credential.getWitness(merkleMap);
+
+    const root = await merkleMap.getRoot();
+
+    // admin update credential commitment
+    appChain.setSigner(adminPrivateKey);
+    const tx20 = await appChain.transaction(adminPublicKey, async () => {
+      await minaLendMod.updateCredentialCommit(root);
+    });
+
+    await tx20.sign();
+    await tx20.send();
+
+    const block20= await appChain.produceBlock();
+
+
+    const publicInput = new CredentialPublicInput({
+        credentialCommitment: root,
+        minPropertyValue: offer1.minPropertyValue.value,
+        minIncomeMonthly: offer1.minIncomeMonthly.value,
+        address: bobPublicKey,
+    });
+
+
+
+    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+
+    expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
+
+
+    const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
+    expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
+    expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
+    expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
+
+    const myProof = new MyProof(proof);
+
+
     // accept offer
     const tx2 = await appChain.transaction(bobPublicKey, async () => {
-      await minaLendMod.acceptOffer(oKey, bobPublicKey);
+      await minaLendMod.acceptOffer(oKey, bobPublicKey, myProof);
     });
     await tx2.sign();
     await tx2.send();
@@ -592,6 +713,8 @@ describe("minalend finalize loan", () => {
     const alicePublicKey = alicePrivateKey.toPublicKey();
     const bobPrivateKey = PrivateKey.random();
     const bobPublicKey = bobPrivateKey.toPublicKey();
+    const adminPrivateKey = PrivateKey.random();
+    const adminPublicKey = adminPrivateKey.toPublicKey();
 
     appChain.setSigner(alicePrivateKey);
 
@@ -649,9 +772,68 @@ describe("minalend finalize loan", () => {
     expect(savedOffer1?.amount.toBigInt()).toBe(1000n);
     appChain.setSigner(bobPrivateKey);
 
+
+
+    const { verificationKey } = await GenerateProof.compile();
+
+    const merkleMap = new MerkleMap();
+
+    const nonce = Field(10);
+    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
+
+    const credential = new Credential({
+        identity: Field(1),
+        propertyValue: Field(20000000),
+        incomeMonthly: Field(20000000),
+        maskedAddress: maskedAddress,
+    });
+
+    const credentialHash = credential.getCredentialHash();
+
+    await credential.addCredential(merkleMap);
+
+    const witness = await credential.getWitness(merkleMap);
+
+    const root = await merkleMap.getRoot();
+
+    // admin update credential commitment
+    appChain.setSigner(adminPrivateKey);
+    const tx20 = await appChain.transaction(adminPublicKey, async () => {
+      await minaLendMod.updateCredentialCommit(root);
+    });
+
+    await tx20.sign();
+    await tx20.send();
+
+    const block20= await appChain.produceBlock();
+
+
+    const publicInput = new CredentialPublicInput({
+        credentialCommitment: root,
+        minPropertyValue: offer1.minPropertyValue.value,
+        minIncomeMonthly: offer1.minIncomeMonthly.value,
+        address: bobPublicKey,
+    });
+
+
+
+    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+
+    expect(proof.publicInput.address.equals(bobPublicKey), "Borrower does not match");
+
+
+    const readCredentialCommit = await appChain.query.runtime.MinaLendModule.credentialCommit.get();
+    expect(proof.publicInput.credentialCommitment.equals(readCredentialCommit ?? Field(0)), "Credential commitment does not match");
+    expect(proof.publicInput.minPropertyValue.equals(offer1.minPropertyValue.value), "Minimum property value does not match");
+    expect(proof.publicInput.minIncomeMonthly.equals(offer1.minIncomeMonthly.value), "Minimum income monthly does not match");
+
+    const myProof = new MyProof(proof);
+
+
+
     // accept offer
     const tx2 = await appChain.transaction(bobPublicKey, async () => {
-      await minaLendMod.acceptOffer(oKey, bobPublicKey);
+      await minaLendMod.acceptOffer(oKey, bobPublicKey, myProof);
     });
     await tx2.sign();
     await tx2.send();
