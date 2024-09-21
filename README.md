@@ -1,5 +1,5 @@
 <div align="center">
-    <img alt="MINALEND" width="170" height="170" src="logo.png"/>
+    <img alt="MINALEND" width="170" height="170" src="apps/web/public/logo.png"/>
 </div>
 
 # MINALEND - The First Unsecured Loans DeFi App with ZKP Technology
