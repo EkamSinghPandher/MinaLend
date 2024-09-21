@@ -40,7 +40,7 @@ describe("minalend", () => {
       lender: alicePublicKey,
       borrower: bobPublicKey,
       annualInterestRate: UInt64.from(10),
-      tokenId: UInt64.from(0),
+      tokenId: TokenId.from(0),
       amount: UInt64.from(1000),
       period: UInt64.from(12),
       minPropertyValue: UInt64.from(100000),
