@@ -30,8 +30,6 @@ describe("minalend create offer", () => {
 
     const alicePrivateKey = PrivateKey.random();
     const alicePublicKey = alicePrivateKey.toPublicKey();
-    const bobPrivateKey = PrivateKey.random();
-    const bobPublicKey = alicePrivateKey.toPublicKey();
     const tokenId = TokenId.from(0);
 
     appChain.setSigner(alicePrivateKey);
@@ -41,7 +39,7 @@ describe("minalend create offer", () => {
     const offer = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: bobPublicKey,
+      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
       amount: UInt64.from(1000),
@@ -94,8 +92,6 @@ describe("minalend cancel offer", () => {
 
     const alicePrivateKey = PrivateKey.random();
     const alicePublicKey = alicePrivateKey.toPublicKey();
-    const bobPrivateKey = PrivateKey.random();
-    const bobPublicKey = alicePrivateKey.toPublicKey();
     const tokenId = TokenId.from(0);
 
     appChain.setSigner(alicePrivateKey);
@@ -105,7 +101,7 @@ describe("minalend cancel offer", () => {
     const offer = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: bobPublicKey,
+      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
       amount: UInt64.from(1000),
@@ -152,7 +148,7 @@ describe("minalend cancel offer", () => {
 
 
 /// Test for updating the offer
-describe("minalend cancel offer", () => {
+describe("minalend update offer", () => {
   it("should demonstrate how MinaLend updating of an offer works", async () => {
     const appChain = TestingAppChain.fromRuntime({
       MinaLendModule,
@@ -173,8 +169,6 @@ describe("minalend cancel offer", () => {
 
     const alicePrivateKey = PrivateKey.random();
     const alicePublicKey = alicePrivateKey.toPublicKey();
-    const bobPrivateKey = PrivateKey.random();
-    const bobPublicKey = alicePrivateKey.toPublicKey();
     const tokenId = TokenId.from(0);
 
     appChain.setSigner(alicePrivateKey);
@@ -184,7 +178,7 @@ describe("minalend cancel offer", () => {
     const offer1 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: bobPublicKey,
+      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(10),
       tokenId: TokenId.from(0),
       amount: UInt64.from(1000),
@@ -216,7 +210,7 @@ describe("minalend cancel offer", () => {
     const offer2 = new Offer({
       offerId: oKey,
       lender: alicePublicKey,
-      borrower: bobPublicKey,
+      borrower: PublicKey.empty(),
       annualInterestRate: UInt64.from(5),
       tokenId: TokenId.from(0),
       amount: UInt64.from(500),
@@ -271,7 +265,7 @@ describe("minalend accept offer", () => {
     const alicePrivateKey = PrivateKey.random();
     const alicePublicKey = alicePrivateKey.toPublicKey();
     const bobPrivateKey = PrivateKey.random();
-    const bobPublicKey = alicePrivateKey.toPublicKey();
+    const bobPublicKey = bobPrivateKey.toPublicKey();
     const tokenId = TokenId.from(0);
 
     appChain.setSigner(alicePrivateKey);
@@ -308,6 +302,8 @@ describe("minalend accept offer", () => {
 
     expect(block1?.transactions[0].status.toBoolean()).toBe(true);
     expect(onChainOffer1?.amount.toBigInt()).toBe(1000n);
+
+    appChain.setSigner(bobPrivateKey);
 
    
     const tx2 = await appChain.transaction(bobPublicKey, async () => {
