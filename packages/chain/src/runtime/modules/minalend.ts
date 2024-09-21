@@ -1,4 +1,4 @@
-import { PublicKey, UInt64 } from "o1js";
+import { PublicKey } from "o1js";
 
 import {
     RuntimeModule,
@@ -8,6 +8,7 @@ import {
 } from "@proto-kit/module";
 import { State, StateMap, Option, assert } from "@proto-kit/protocol";
 import { Offer } from "./offer"
+import { UInt64 } from "@proto-kit/library";
 
 interface MinaLendConfig {
 
@@ -19,6 +20,6 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
 
     @runtimeMethod()
     public async createOffer(o: Offer) {
-        this.offers.set(o.offerId, o);
+        await this.offers.set(o.offerId, o);
     }
 }

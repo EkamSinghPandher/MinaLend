@@ -1,10 +1,10 @@
 import { TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, UInt64 } from "o1js";
+import { PrivateKey } from "o1js";
 import { Balances } from "../../../src/runtime/modules/balances";
 import { MinaLendModule } from "../../../src/runtime/modules/minalend";
 import { Offer } from "../../../src/runtime/modules/offer";
 import { log } from "@proto-kit/common";
-import { TokenId } from "@proto-kit/library";
+import { TokenId, UInt64 } from "@proto-kit/library";
 
 log.setLevel("ERROR");
 
@@ -35,8 +35,10 @@ describe("minalend", () => {
 
     appChain.setSigner(alicePrivateKey);
 
+    const oKey = UInt64.from(12);
+
     const offer = new Offer({
-      offerId: UInt64.from(12),
+      offerId: oKey,
       lender: alicePublicKey,
       borrower: bobPublicKey,
       annualInterestRate: UInt64.from(10),
@@ -61,9 +63,13 @@ describe("minalend", () => {
 
     const block = await appChain.produceBlock();
 
-    const onChainOffer = await appChain.query.runtime.MinaLendModule.offers.get(UInt64.from(0));
+
+
+    const onChainOffer = await appChain.query.runtime.MinaLendModule.offers.get(oKey);
+
+    console.log(onChainOffer);
 
     expect(block?.transactions[0].status.toBoolean()).toBe(true);
-    // expect(onChainOffer?.offerId.toBigInt()).toBe(0n);
+    expect(onChainOffer?.status.toBigInt()).toBe(0n);
   }, 1_000_000);
 });
