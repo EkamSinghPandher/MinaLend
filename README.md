@@ -2,9 +2,9 @@
     <img alt="MINALEND" width="170" height="170" src="apps/web/public/logo.png"/>
 </div>
 
-# ZkCredit - The First ZeroKnowlege Personal Loans DeFi App
+# ZkCredit - The First ZeroKnowlege Personal Loan (Credit) DeFi App
 
-This project is developed based on MINA's [Protokit](https://github.com/proto-kit) [starter-kit](https://github.com/proto-kit/starter-kit). ([original README](https://github.com/proto-kit/starter-kit/blob/develop/README.md)).
+This project is developed based on MINA's [Protokit](https://github.com/proto-kit) [starter-kit](https://github.com/proto-kit/starter-kit) ([original README](https://github.com/proto-kit/starter-kit/blob/develop/README.md)).
 
 ## Full Description
 
@@ -66,3 +66,5 @@ pnpm run test --filter=chain -- --watchAll
 - Integrate a Mina <-> Ethereum bridge such as the LambdaClass [mina_bridge](https://github.com/lambdaclass/mina_bridge). Note that mina_bridge is work-in-progress. We plan to integrate it when the project is in a relatively stable form.
 
 - Integrate [SingPass](https://api.singpass.gov.sg/) to get proof of assets in Singapore.
+
+- Integrate [worldcoin](https://worldcoin.org/) ID into the traceable identity feature.
