@@ -174,11 +174,10 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         await this.offers.set(offerId, newOffer);
     }
 
-    // TODO: Verify Proof of assets @Jason
-    // TODO: Deduct the loan amount from pool and give it to the borrower @Dumi
     // TODO: VerificationKey should be stored in the contract
+    // TODO: Debugging: the proof is not verified
     @runtimeMethod()
-    public async acceptOffer(offerId: UInt64, borrower: PublicKey, proof: MyProof){
+    public async acceptOfferWithProof(offerId: UInt64, borrower: PublicKey, proof: MyProof){
 
         //(await this.admin.get()).value)
 
@@ -192,8 +191,29 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         assert(proof.publicInput.minPropertyValue.equals(offer.minPropertyValue.value), "Minimum property value does not match");
         assert(proof.publicInput.minIncomeMonthly.equals(offer.minIncomeMonthly.value), "Minimum income monthly does not match");
 
-        // verify proof 
+        // verify proof
         proof.verify();
+
+        offer.status =  UInt64.from(1);
+        // Make sure the pool has sufficient tokens
+        const poolBalance = await this.balances.getBalance(offer.tokenId, this.pool);
+        assert(poolBalance.greaterThanOrEqual(offer.amount));
+
+        offer.status = UInt64.from(1);
+
+        let loan = fromOffer(offer, borrower);
+        await this.offers.set(offerId, offer);
+        await this.loans.set(loan.loanId, loan);
+
+        // transfer tokens from pool to borrower
+        await this.balances.transfer(offer.tokenId, this.pool, borrower, offer.amount);
+    }
+
+    @runtimeMethod()
+    public async acceptOffer(offerId: UInt64, borrower: PublicKey) {
+        let offerResult = (await this.offers.get(offerId));
+        assert(offerResult.isSome);
+        let offer = offerResult.value;
 
         offer.status =  UInt64.from(1);
         // Make sure the pool has sufficient tokens

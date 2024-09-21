@@ -4,7 +4,7 @@
 
 # ZkCredit - The First ZeroKnowlege Personal Loan (Credit) DeFi App
 
-This project is developed based on MINA's [Protokit](https://github.com/proto-kit) [starter-kit](https://github.com/proto-kit/starter-kit) ([original README](https://github.com/proto-kit/starter-kit/blob/develop/README.md)).
+This project is developed based on Mina's [Protokit](https://github.com/proto-kit) [starter-kit](https://github.com/proto-kit/starter-kit) ([original README](https://github.com/proto-kit/starter-kit/blob/develop/README.md)).
 
 ## Full Description
 
@@ -20,7 +20,7 @@ Our model also allows for an orderbook-style loan marketplace where lenders can 
 
 ### Implementation
 
-The project is based on the hybrid runtime model of Mina and utilizes the Protokit to build and prove the constraints for the proof of assets and income. We initially planned to use government entities' signatures to prove the ownership of assets (such as the ECDSA signature used by the Singapore Government in Singpass) however, as of now, we could not find an sdk/open source project on Mina that does so for any reasonable signature scheme. Instead, we hacked together a Merkle tree implementation where the leaves are assets of every individual in a country, a Merkle tree constructed by the government. Borrowers then prove their Merkle proof of inclusion as well as showing that the assets satisfy min_value constraints.
+The project is based on the hybrid runtime model of Mina and utilizes the Protokit to build and prove the constraints for the proof of assets and income. We initially planned to use government entities' signatures to prove the ownership of assets (such as the ECDSA signature used by the Singapore Government in [SingPass](https://api.singpass.gov.sg/)) however, as of now, we could not find an sdk/open source project on Mina that does so for any reasonable signature scheme. Instead, we hacked together a Merkle tree implementation where the leaves are assets of every individual in a country, a Merkle tree constructed by the government. Borrowers then prove their Merkle proof of inclusion as well as showing that the assets satisfy min_value constraints.
 
 We also designed a traceable identity system, utilizing a nonce, hashes of the assets, and only one message between a borrower and a lender. This way, a defaulting borrower can be blacklisted and their assets cannot be reused for another loan. In the future, we may use Worldcoin ID for this feature.
 
