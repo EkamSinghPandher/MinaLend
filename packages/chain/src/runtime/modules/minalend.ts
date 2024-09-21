@@ -1,4 +1,4 @@
-import { Bool, PublicKey } from "o1js";
+import { Bool, Provable, PublicKey } from "o1js";
 
 import {
     RuntimeModule,
@@ -78,5 +78,57 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         let loan = fromOffer(offer);
         await this.offers.set(offerId, offer);
         await this.loans.set(loan.loanId, loan);
+    }
+
+
+    // TODO: Deduct the loan amount from borrower and transfer it to the sender. @Dumi
+    @runtimeMethod()
+    public async repayLoan(loanId: UInt64, amount: UInt64){
+        let loanResult = await this.loans.get(loanId);
+        assert(loanResult.isSome);
+        let loan = loanResult.value;
+
+        let amountRemainingField = loan.offer.amount.value.add(loan.interestAdded.value).sub(loan.amountPaid.value);
+        console.log(amountRemainingField.value);
+        let amountRemaining = new UInt64({value: amountRemainingField});
+        
+
+        // loan repaid 
+        if (amount.value.equals(amountRemaining.value)) {
+            console.log("this happens")
+            // set offer to be cleared
+            let offerId = loan.offer.offerId;
+            let offerResult = await this.offers.get(offerId);
+            assert(offerResult.isSome);
+            let offer = offerResult.value;
+            offer.status = UInt64.from(2);
+            await this.offers.set(offerId, offer);
+
+            // Set loan amount paid to be fulfilled
+            loan.amountPaid = new UInt64({value: loan.amountPaid.value.add(amount.value)});
+            loan.isCompleted = Bool(true);
+
+        // too much paid only deduct what is owed (amount remaining)
+        } else if (amount.value.greaterThan(amountRemaining.value)) {
+            console.log("this happens2")
+            // set offer to be cleared
+            let offerId = loan.offer.offerId;
+            let offerResult = await this.offers.get(offerId);
+            assert(offerResult.isSome);
+            let offer = offerResult.value;
+            offer.status = UInt64.from(2);
+            await this.offers.set(offerId, offer);
+
+            // Set loan amount paid to be fulfilled
+            loan.amountPaid = new UInt64({value: loan.amountPaid.value.add(amountRemaining.value)});
+            loan.isCompleted = Bool(true);
+
+        // Less than amount left paid
+        } else {
+            // Set loan amount paid to be fulfilled
+            loan.amountPaid = new UInt64({value: loan.amountPaid.value.add(amount.value)});
+        }
+
+        await this.loans.set(loanId, loan);
     }
 }
