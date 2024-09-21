@@ -1,3 +1,4 @@
+import { TokenId } from "@proto-kit/library";
 import { PublicKey, Struct, UInt64 } from "o1js";
 
 export class Offer extends Struct({
@@ -5,7 +6,7 @@ export class Offer extends Struct({
     lender: PublicKey,                      // The lender's identifier
     borrower: PublicKey,                    // The borrower's identifier
     annualInterestRate: UInt64,             // The annual interest rate (as a percentage or decimal)
-    tokenId: UInt64,                        // The token/currency of the loan
+    tokenId: TokenId,                        // The token/currency of the loan
     amount: UInt64,                         // The lending amount offered
     period: UInt64,                         // The lending period in days
     minPropertyValue: UInt64,               // The minimum property value that has to be proved
