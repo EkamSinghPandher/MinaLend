@@ -13,9 +13,9 @@ describe('Test GenerateMerkleProof', () => {
     const bobPrivateKey = PrivateKey.random();
     const bobPublicKey = bobPrivateKey.toPublicKey();
 
-    const nonce = Field(10);
+    const borrowerNonce = Field(10);
 
-    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), nonce]);
+    const maskedAddress = Poseidon.hash([...bobPublicKey.toFields(), borrowerNonce]);
 
     const credential = new Credential({
       identity: Field(1),
@@ -33,14 +33,20 @@ describe('Test GenerateMerkleProof', () => {
     const witness = await credential.getWitness(merkleMap);
     const root = await merkleMap.getRoot();
 
+    const lenderNonce = Field(1);
+    const lenderNonceHash = Poseidon.hash([lenderNonce]);
+    const nullifier = Poseidon.hash([credential.identity, lenderNonce]);
+
     const publicInput = new CredentialPublicInput({
         credentialCommitment: root,
         minPropertyValue,
         minIncomeMonthly,
         address: bobPublicKey,
+        lenderNonceHash,
+        nullifier,
     });
 
-    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, nonce);
+    const proof = await GenerateProof.verifyCredential(publicInput, witness, credential, borrowerNonce, lenderNonce);
     const ok = await verify(proof, verificationKey);
     expect(ok).toBe(true);
 

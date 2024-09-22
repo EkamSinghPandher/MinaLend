@@ -192,7 +192,7 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         assert(proof.publicInput.credentialCommitment.equals((await this.credentialCommit.get()).value), "Credential commitment does not match");
         assert(proof.publicInput.minPropertyValue.equals(offer.minPropertyValue.value), "Minimum property value does not match");
         assert(proof.publicInput.minIncomeMonthly.equals(offer.minIncomeMonthly.value), "Minimum income monthly does not match");
-
+        assert(proof.publicInput.lenderNonceHash.equals(offer.lenderNonceHash), "Lender nonce hash does not match");
         // verify proof 
         proof.verify();
 
@@ -203,6 +203,7 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
 
         offer.status = UInt64.from(1);
         offer.borrower = borrower;
+        offer.nullifier = proof.publicInput.nullifier;
 
         let loan = fromOffer(offer);
         await this.offers.set(offerId, offer);
@@ -249,7 +250,8 @@ export class MinaLendModule extends RuntimeModule<MinaLendConfig> {
         await this.offers.set(offer.offerId, offer);
     }
 
-    // admin functions
+    // credential issuer functions
+    // TODO: separate the issuer to a different module
     @runtimeMethod()
     public async updateCredentialCommit(credentialCommit: Field) {
         // assert(this.transaction.sender.value.equals((await this.admin.get()).value));

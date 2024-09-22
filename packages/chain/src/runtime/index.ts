@@ -11,7 +11,7 @@ export const modules = VanillaRuntimeModules.with({
 
 export const config: ModulesConfig<typeof modules> = {
   Balances: {
-    totalSupply: Balance.from(10_000),
+    totalSupply: Balance.from(100_000_000),
   },
   MinaLendModule: {
     tokenId: TokenId.from(0),

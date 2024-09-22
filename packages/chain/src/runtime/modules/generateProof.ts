@@ -6,6 +6,8 @@ export class CredentialPublicInput extends Struct({
   minPropertyValue: Field,
   minIncomeMonthly: Field,
   address: PublicKey,
+  lenderNonceHash: Field,
+  nullifier: Field,
 }) {}
 
 export const GenerateProof = ZkProgram({
@@ -14,9 +16,9 @@ export const GenerateProof = ZkProgram({
 
   methods: {
     verifyCredential: {
-      privateInputs: [MerkleMapWitness, Credential, Field],
+      privateInputs: [MerkleMapWitness, Credential, Field, Field],
 
-      async method(publicInput: CredentialPublicInput,  witness: MerkleMapWitness, credential: Credential, nonce: Field) {
+      async method(publicInput: CredentialPublicInput,  witness: MerkleMapWitness, credential: Credential, borrowerNonce: Field, lenderNonce: Field) {
         // check if the credential is valid
         const credentialHash = credential.getCredentialHash();
         const [computedRoot, computedKey] = await witness.computeRootAndKeyV2(credentialHash);
@@ -28,11 +30,19 @@ export const GenerateProof = ZkProgram({
         credential.incomeMonthly.assertGreaterThanOrEqual(publicInput.minIncomeMonthly);
         
         // check if the masked address is correct
-        const maskedAddress = Poseidon.hash([...publicInput.address.toFields(), nonce]);
+        const maskedAddress = Poseidon.hash([...publicInput.address.toFields(), borrowerNonce]);
         credential.maskedAddress.assertEquals(maskedAddress);
 
         // check if the credential is not blacklisted
         credential.blacklisted.assertFalse();
+
+        // check if the lender nonce hash is correct
+        const lenderNonceHash = Poseidon.hash([lenderNonce]);
+        publicInput.lenderNonceHash.assertEquals(lenderNonceHash);
+
+        // check if the nullifier is correct
+        const nullifier = Poseidon.hash([credential.identity, lenderNonce]);
+        publicInput.nullifier.assertEquals(nullifier);
       },
     },
 
